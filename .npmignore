@@ -1,3 +1,7 @@
+# Source files (original code ko publish mat karo)
+index.js
+build.js
+
 # Source control
 .git/
 .gitignore

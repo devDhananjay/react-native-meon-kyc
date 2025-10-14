@@ -1,37 +1,42 @@
 {
   "name": "react-native-meon-kyc",
-  "version": "1.0.0",
+  "version": "1.0.4",
   "description": "Complete KYC solution with IPV verification for React Native",
-  "main": "index.js",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "node build.js",
+    "prepublishOnly": "npm run build",
+    "test": "echo \"No tests yet\""
+  },
+  "keywords": [
+    "react-native",
+    "kyc",
+    "ipv"
+  ],
+  "author": "Dhananjay",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/devDhananjay/react-native-meon-kyc.git"
   },
-  "bugs": {
-    "url": "https://github.com/devDhananjay/react-native-meon-kyc/issues"
-  },
-  "homepage": "https://github.com/devDhananjay/react-native-meon-kyc#readme",
-  "keywords": [
-    "react-native",
-    "kyc",
-    "ekyc",
-    "ipv",
-    "verification",
-    "meon",
-    "biometric",
-    "face-recognition",
-    "video-kyc",
-    "payments",
-    "upi"
-  ],
-  "author": "Dhananjay <your.email@example.com>",
-  "license": "MIT",
   "peerDependencies": {
     "react": ">=16.8.0",
     "react-native": ">=0.60.0"
   },
   "dependencies": {
-    "react-native-webview": ">=11.0.0",
-    "react-native-permissions": ">=3.0.0"
-  }
+    "react-native-permissions": ">=3.0.0",
+    "react-native-webview": ">=11.0.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.28.4",
+    "@babel/preset-env": "^7.28.3",
+    "@babel/preset-react": "^7.27.1",
+    "javascript-obfuscator": "^4.1.0",
+    "terser": "^5.24.0"
+  },
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE"
+  ]
 }
