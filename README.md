@@ -259,22 +259,8 @@ Enable console logs to see detailed information:
 ## 🤝 Dependencies
 
 This package requires:
-- `react-native-webview` (>=11.0.0)
+
 - `react-native-permissions` (>=3.0.0)
-
-These will be automatically installed as peer dependencies.
-
-## 📄 Example App
-
-Check out the example app in the repository:
-
-```bash
-git clone https://github.com/yourusername/react-native-meon-kyc.git
-cd react-native-meon-kyc/example
-npm install
-cd ios && pod install && cd ..
-npm run ios  # or npm run android
-```
 
 ## 🛠️ Troubleshooting
 
@@ -334,10 +320,9 @@ For support, email support@meon.co.in or create an issue in the GitHub repositor
 ## 🔗 Links
 
 - [NPM Package](https://www.npmjs.com/package/react-native-meon-kyc)
-- [GitHub Repository](https://github.com/yourusername/react-native-meon-kyc)
 - [Documentation](https://github.com/yourusername/react-native-meon-kyc#readme)
 - [Report Bug](https://github.com/yourusername/react-native-meon-kyc/issues)
 
 ---
 
-Made with ❤️ by [Your Name]
+Made with ❤️ by Meon Technologies Pvt Ltd.

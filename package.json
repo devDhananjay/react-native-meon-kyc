@@ -1,6 +1,6 @@
 {
   "name": "react-native-meon-kyc",
-  "version": "1.0.0",
+  "version": "1.0.5",
   "description": "Complete KYC solution with IPV verification for React Native",
   "main": "index.js",
   "repository": {
@@ -24,7 +24,7 @@
     "payments",
     "upi"
   ],
-  "author": "Dhananjay <your.email@example.com>",
+  "author": "Dhananjay (dhananjay@meon.co.in)",
   "license": "MIT",
   "peerDependencies": {
     "react": ">=16.8.0",
