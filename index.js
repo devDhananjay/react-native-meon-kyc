@@ -38,17 +38,52 @@ const MeonKYC = ({
   const [isIpvStep, setIsIpvStep] = useState(false);
 
   const webViewRef = useRef(null);
+  const successCalledRef = useRef(false);
+  const initialLogoutDoneRef = useRef(false);
 
-  // Validate required props
+  // Perform initial logout and validate required props
   useEffect(() => {
-    if (!companyName) {
-      const errorMsg = 'companyName is required';
-      setError(errorMsg);
-      onError?.(errorMsg);
-    } else {
+    const performInitialLogout = async () => {
+      if (!companyName) {
+        const errorMsg = 'companyName is required';
+        setError(errorMsg);
+        onError?.(errorMsg);
+        setIsLoading(false);
+        return;
+      }
+
+      // Perform initial logout only once
+      if (!initialLogoutDoneRef.current) {
+        try {
+          console.log('[MeonKYC] Performing initial logout...');
+          const logoutUrl = `${baseURL}/${companyName}/logout`;
+          
+          const logoutResponse = await fetch(logoutUrl, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          });
+          
+          if (logoutResponse.ok) {
+            const logoutData = await logoutResponse.json();
+            console.log('[MeonKYC] Initial logout successful:', logoutData);
+          } else {
+            console.warn('[MeonKYC] Initial logout failed with status:', logoutResponse.status);
+          }
+        } catch (logoutError) {
+          console.error('[MeonKYC] Error in initial logout:', logoutError);
+          // Continue even if logout fails
+        }
+        
+        initialLogoutDoneRef.current = true;
+      }
+      
       setIsLoading(false);
-    }
-  }, [companyName]);
+    };
+
+    performInitialLogout();
+  }, [companyName, baseURL]);
 
   // Check if current URL is IPV step
   const checkIfIpvStep = (url) => {
@@ -57,6 +92,17 @@ const MeonKYC = ({
       url.includes('/ipv') ||
       url.toLowerCase().includes('face') ||
       url.toLowerCase().includes('video')
+    );
+  };
+
+  // Check if current URL is success/completion page
+  const checkIfSuccessPage = (url) => {
+    return url && (
+      url.includes('/thank-you') ||
+      url.includes('/success') ||
+      url.includes('/complete') ||
+      url.includes('/thankyou') ||
+      url.toLowerCase().includes('completed')
     );
   };
 
@@ -227,6 +273,76 @@ const MeonKYC = ({
     true;
   `;
 
+  // Success page detection script
+  const successDetectionScript = `
+    (function() {
+      // Prevent multiple executions
+      if (window.__kycSuccessDetected) {
+        return;
+      }
+      
+      const checkForSuccessPage = () => {
+        // Get page text
+        const pageText = document.body.innerText || document.body.textContent || '';
+        
+        // VERY SPECIFIC check - only trigger on the exact success page
+        const hasThankYou = pageText.includes('Thank You');
+        const hasJourneyCompleted = pageText.includes('journey has been completed');
+        const hasRedirecting = pageText.includes('Redirecting in') || pageText.includes('redirecting in');
+        
+        // Only trigger if ALL three conditions are met
+        if (hasThankYou && hasJourneyCompleted && hasRedirecting) {
+          // Mark as detected to prevent duplicate calls
+          if (window.__kycSuccessDetected) {
+            return;
+          }
+          window.__kycSuccessDetected = true;
+          
+          console.log('[MeonKYC] Success page detected - Thank You page with redirect');
+          
+          // Send message to React Native
+          if (window.ReactNativeWebView) {
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'KYC_SUCCESS',
+              status: 'completed',
+              timestamp: new Date().toISOString(),
+              url: window.location.href
+            }));
+          }
+        }
+      };
+      
+      // Check immediately
+      checkForSuccessPage();
+      
+      // Check after DOM is fully loaded
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', checkForSuccessPage);
+      }
+      
+      // Also check after delays for dynamic content
+      setTimeout(checkForSuccessPage, 500);
+      setTimeout(checkForSuccessPage, 1000);
+      
+      // Watch for DOM changes (in case content loads dynamically)
+      const observer = new MutationObserver(() => {
+        checkForSuccessPage();
+      });
+      
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+        characterData: true
+      });
+      
+      // Stop observing after 3 seconds
+      setTimeout(() => {
+        observer.disconnect();
+      }, 3000);
+    })();
+    true;
+  `;
+
   // Payment handling script
   const paymentHandlingScript = enablePayments ? `
     (function() {
@@ -371,7 +487,11 @@ const MeonKYC = ({
     setWebViewRendered(true);
     
     if (webViewRef.current) {
-      webViewRef.current.injectJavaScript(`${permissionInjectionScript}; ${paymentHandlingScript}`);
+      webViewRef.current.injectJavaScript(`
+        ${permissionInjectionScript}; 
+        ${paymentHandlingScript};
+        ${successDetectionScript}
+      `);
     }
   };
 
@@ -390,16 +510,70 @@ const MeonKYC = ({
     setWebViewLoading(false);
   };
 
-  const handleWebViewMessage = (event) => {
+  const handleWebViewMessage = async (event) => {
     try {
-      const message = event.nativeEvent.data;
-      console.log('[MeonKYC] Message:', message);
+      const data = event.nativeEvent.data;
+      console.log('[MeonKYC] Message received:', data);
 
-      // Handle custom messages
-      if (message.includes('SUCCESS')) {
-        onSuccess?.(message);
-      } else if (message.includes('ERROR')) {
-        onError?.(message);
+      // Try to parse as JSON
+      let message;
+      try {
+        message = JSON.parse(data);
+      } catch {
+        message = { type: 'TEXT', data };
+      }
+
+      // Handle KYC success message
+      if (message.type === 'KYC_SUCCESS' || 
+          (typeof data === 'string' && data.includes('SUCCESS'))) {
+        
+        // Check if onSuccess already called
+        if (successCalledRef.current) {
+          console.log('[MeonKYC] Success already called, ignoring duplicate');
+          return;
+        }
+        
+        // Mark as called
+        successCalledRef.current = true;
+        
+        console.log('[MeonKYC] KYC completed successfully');
+        
+        // Perform logout before calling onSuccess
+        try {
+          console.log('[MeonKYC] Performing logout...');
+          const logoutUrl = `${baseURL}/${companyName}/logout`;
+          
+          const logoutResponse = await fetch(logoutUrl, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          });
+          
+          if (logoutResponse.ok) {
+            const logoutData = await logoutResponse.json();
+            console.log('[MeonKYC] Logout successful:', logoutData);
+          } else {
+            console.warn('[MeonKYC] Logout failed with status:', logoutResponse.status);
+          }
+        } catch (logoutError) {
+          console.error('[MeonKYC] Error in logout:', logoutError);
+          // Continue even if logout fails
+        }
+        
+        // Call onSuccess after logout
+        onSuccess?.({
+          status: 'completed',
+          timestamp: message.timestamp || new Date().toISOString(),
+          url: message.url || currentUrl,
+          message: 'KYC process completed successfully'
+        });
+      } 
+      // Handle error messages
+      else if (message.type === 'KYC_ERROR' || 
+               (typeof data === 'string' && data.includes('ERROR'))) {
+        console.log('[MeonKYC] KYC error');
+        onError?.(message.message || data);
       }
     } catch (error) {
       console.log('[MeonKYC] Error handling message:', error);
@@ -516,7 +690,11 @@ const MeonKYC = ({
           cacheEnabled={true}
           allowsFullscreenVideo={true}
           userAgent="Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Mobile Safari/537.36"
-          injectedJavaScript={`${permissionInjectionScript}; ${paymentHandlingScript}`}
+          injectedJavaScript={`
+            ${permissionInjectionScript}; 
+            ${paymentHandlingScript};
+            ${successDetectionScript}
+          `}
           injectedJavaScriptBeforeContentLoaded={`
             window.permissionsGranted = ${permissionsGranted};
             window.paymentHandlingEnabled = ${enablePayments};
